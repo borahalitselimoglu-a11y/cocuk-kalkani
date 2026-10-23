@@ -3,6 +3,9 @@ package com.cocukkalkani.app
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
+import android.widget.FrameLayout
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.Gravity
@@ -34,28 +37,63 @@ class LockActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
 
+        window.statusBarColor = Palette.HERO[0]
+
         icon = ImageView(this)
-        title = text("", 20f, bold = true).apply { gravity = Gravity.CENTER }
-        pin = pinField("Ebeveyn PIN'i").apply {
+        title = text("", 22f, bold = true).apply { gravity = Gravity.CENTER }
+        pin = pinField("🔑 Ebeveyn PIN'i").apply {
             imeOptions = EditorInfo.IME_ACTION_DONE
             setOnEditorActionListener { _, _, _ -> tryUnlock(); true }
+        }
+
+        // Ortadaki beyaz kart
+        val cardView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            background = round(Color.WHITE, 32)
+            elevation = dp(8).toFloat()
+            setPadding(dp(24), dp(20), dp(24), dp(24))
+
+            addView(FrameLayout(context).apply {
+                // Uygulama simgesi + köşesinde kilit rozeti
+                addView(icon, FrameLayout.LayoutParams(dp(76), dp(76)).apply {
+                    gravity = Gravity.CENTER
+                })
+                addView(TextView(context).apply {
+                    text = "🔒"
+                    textSize = 18f
+                    gravity = Gravity.CENTER
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        setColor(Color.parseColor("#FFE08A"))
+                        setStroke(dp(3), Color.WHITE)
+                    }
+                }, FrameLayout.LayoutParams(dp(36), dp(36)).apply {
+                    gravity = Gravity.BOTTOM or Gravity.END
+                })
+            }, LinearLayout.LayoutParams(dp(96), dp(96)))
+            addView(title)
+            addView(text("Bu uygulamayı açmak için annenden ya da babandan izin iste 😊", 15f,
+                color = Palette.INK_SOFT).apply { gravity = Gravity.CENTER })
+            addView(pin, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(14) })
+            addView(button("🔓  Kilidi aç", Tones.PURPLE.accent) { tryUnlock() })
+            addView(button("🏠  Ana ekrana dön", Tones.PURPLE.light, Tones.PURPLE.accent) { goHome() })
         }
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setBackgroundColor(Color.parseColor("#F1F8E9"))
-            setPadding(dp(32), dp(32), dp(32), dp(32))
-            addView(icon, LinearLayout.LayoutParams(dp(72), dp(72)).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-            })
-            addView(title)
-            addView(text("Bu uygulama ebeveyn tarafından kilitlendi.").apply {
-                gravity = Gravity.CENTER
-            })
-            addView(pin)
-            addView(button("Kilidi aç") { tryUnlock() })
-            addView(button("Ana ekrana dön") { goHome() })
+            background = LayerDrawable(arrayOf(
+                GradientDrawable(GradientDrawable.Orientation.TL_BR, Palette.HERO),
+                DotsDrawable(intArrayOf(Color.WHITE), dp(30).toFloat(), dp(3).toFloat(), 55)
+            ))
+            setPadding(dp(24), dp(24), dp(24), dp(24))
+            addView(text("🎈  ⭐  🧸  🌈  🎨", 26f).apply { gravity = Gravity.CENTER })
+            addView(cardView, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(12) })
         }
         setContentView(root)
         handle(intent)
@@ -73,7 +111,7 @@ class LockActivity : Activity() {
         val pkg = target ?: return
         try {
             val ai = packageManager.getApplicationInfo(pkg, 0)
-            title.text = "${packageManager.getApplicationLabel(ai)} kilitli"
+            title.text = "${packageManager.getApplicationLabel(ai)} kilitli 🙈"
             icon.setImageDrawable(packageManager.getApplicationIcon(ai))
         } catch (_: Exception) {
             title.text = "Uygulama kilitli"

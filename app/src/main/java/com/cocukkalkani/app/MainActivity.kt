@@ -9,7 +9,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.LayerDrawable
 import android.net.VpnService
 import android.os.Bundle
 import android.os.SystemClock
@@ -21,7 +23,7 @@ import android.widget.BaseAdapter
 import android.widget.Button
 import android.text.Editable
 import android.text.TextWatcher
-import android.widget.CheckBox
+import android.widget.FrameLayout
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -61,16 +63,69 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        list = ListView(this).apply { setPadding(0, 0, 0, dp(24)); clipToPadding = false }
+        window.statusBarColor = Palette.PAGE
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+
+        list = ListView(this).apply {
+            setPadding(0, 0, 0, dp(32))
+            clipToPadding = false
+            divider = null
+            dividerHeight = 0
+            selector = ColorDrawable(Color.TRANSPARENT)
+            cacheColorHint = Color.TRANSPARENT
+        }
         list.addHeaderView(buildHeader(), null, false)
         list.adapter = adapter
 
-        // Arama kutusu: ekranın üstünde sabit, yazınca liste uygulamalara kayar
-        val search = EditText(this).apply {
-            hint = "🔍  Uygulama ara (ör. youtube, oyun)"
+        setContentView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            // Sayfa zemini: krem rengi + soluk konfeti noktaları
+            background = LayerDrawable(arrayOf(
+                ColorDrawable(Palette.PAGE),
+                DotsDrawable(Palette.CONFETTI, dp(34).toFloat(), dp(3).toFloat(), 150)
+            ))
+            addView(buildHero(), LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(dp(12), dp(10), dp(12), dp(4)) })
+            addView(list, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        })
+        loadApps()
+    }
+
+    /** Üstte sabit duran renkli başlık + arama kutusu (uygulamanın adı yalnızca burada). */
+    private fun buildHero(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        background = LayerDrawable(arrayOf(
+            gradient(Palette.HERO, 28),
+            DotsDrawable(intArrayOf(Color.WHITE), dp(26).toFloat(), dp(2).toFloat(), 60)
+        ))
+        clipToOutline = true
+        setPadding(dp(18), dp(14), dp(18), dp(16))
+
+        addView(LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(text("🛡️", 34f))
+            addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(10), 0, 0, 0)
+                addView(text(getString(R.string.app_name), 24f, bold = true, color = Color.WHITE).apply {
+                    setPadding(0, 0, 0, 0)
+                })
+                addView(text("Güvenli ve eğlenceli telefon 🌈✨", 13f, color = Color.parseColor("#F3E9FF")).apply {
+                    setPadding(0, 0, 0, 0)
+                })
+            })
+        })
+
+        val search = EditText(context).apply {
+            hint = "🔍  Uygulama ara… (ör. youtube, oyun)"
+            setHintTextColor(Palette.INK_SOFT)
+            setTextColor(Palette.INK)
             isSingleLine = true
             textSize = 16f
-            setPadding(dp(16), dp(12), dp(16), dp(12))
+            background = round(Color.WHITE, 50)
+            setPadding(dp(18), dp(12), dp(18), dp(12))
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
                 override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
@@ -82,15 +137,9 @@ class MainActivity : Activity() {
             })
             setOnFocusChangeListener { _, has -> if (has) list.setSelection(list.headerViewsCount) }
         }
-
-        setContentView(LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(search, LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { setMargins(dp(12), dp(8), dp(12), 0) })
-            addView(list, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        })
-        loadApps()
+        addView(search, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(12) })
     }
 
     override fun onStart() {
@@ -173,88 +222,75 @@ class MainActivity : Activity() {
     // ------------------------------------------------------------------ üst panel
 
     private fun buildHeader(): View {
-        lockStatus = text("", 15f, bold = true)
-        dnsStatus = text("", 15f, bold = true)
-        adminStatus = text("", 15f, bold = true)
-        dnsToggle = button("") { toggleDns() }
-        providerBtn = button("") { chooseProvider() }
+        lockStatus = chip()
+        dnsStatus = chip()
+        adminStatus = chip()
+        dnsToggle = button("", Tones.GREEN.accent) { toggleDns() }
+        providerBtn = button("", Color.WHITE, Tones.GREEN.accent) { chooseProvider() }
 
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(16), dp(16), dp(8))
+            setPadding(dp(12), 0, dp(12), dp(8))
 
-            addView(text(getString(R.string.app_name), 24f, bold = true))
-
-            addView(card(
-                text("1 · Uygulama kilidi", 13f),
+            addView(card("🔒", "Uygulama kilidi", Tones.BLUE,
                 lockStatus,
-                text("Ayarlar › Erişilebilirlik › İndirilen uygulamalar › Çocuk Kalkanı → Aç", 13f),
-                button("Erişilebilirlik ayarlarını aç") {
+                text("Ayarlar › Erişilebilirlik › İndirilen uygulamalar › Çocuk Kalkanı → Aç", 13f, color = Palette.INK_SOFT),
+                button("⚙️  Erişilebilirlik ayarlarını aç", Tones.BLUE.accent) {
                     openTrusted(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                 }
             ))
 
-            addView(card(
-                text("2 · Reklam ve zararlı site koruması (DNS)", 13f),
+            addView(card("🧹", "Reklam ve zararlı site kalkanı", Tones.GREEN,
                 dnsStatus,
                 providerBtn,
                 dnsToggle,
-                text("Kalıcı olsun: Ayarlar › VPN › Çocuk Kalkanı › \"Her zaman açık VPN\" açın. " +
-                    "\"VPN olmadan bağlantıları engelle\" seçeneğini AÇMAYIN.", 13f),
-                button("VPN ayarlarını aç") { openTrusted(Intent(Settings.ACTION_VPN_SETTINGS)) },
-                button("Alternatif: Özel DNS (VPN'siz)") { showPrivateDnsHelp() }
+                text("💡 Kalıcı olsun: Ayarlar › VPN › Çocuk Kalkanı › \"Her zaman açık VPN\" açın. " +
+                    "\"VPN olmadan bağlantıları engelle\" seçeneğini AÇMAYIN.", 13f, color = Palette.INK_SOFT),
+                button("🌐  VPN ayarlarını aç", Color.WHITE, Tones.GREEN.accent) {
+                    openTrusted(Intent(Settings.ACTION_VPN_SETTINGS))
+                },
+                button("🔁  Alternatif: Özel DNS (VPN'siz)", Color.WHITE, Tones.GREEN.accent) { showPrivateDnsHelp() }
             ))
 
-            addView(card(
-                text("3 · Silme koruması", 13f),
+            addView(card("🧷", "Silme koruması", Tones.ORANGE,
                 adminStatus,
-                button("Silme korumasını etkinleştir") { enableAdmin() }
+                button("🛡️  Silme korumasını etkinleştir", Tones.ORANGE.accent) { enableAdmin() }
             ))
 
-            addView(card(
-                text("Güvenlik", 13f),
-                button("PIN değiştir") { setupPin(firstTime = false) }
+            addView(card("🔑", "Ebeveyn PIN'i", Tones.PURPLE,
+                button("✏️  PIN değiştir", Tones.PURPLE.accent) { setupPin(firstTime = false) }
             ))
 
-            addView(text("Uygulamalar", 18f, bold = true).apply {
-                setPadding(0, dp(16), 0, 0)
-            })
-            addView(text(
-                "Tüm uygulamalar varsayılan olarak KİLİTLİDİR (☑). Çocuğun PIN'siz açabilmesini " +
-                    "istediklerinizin işaretini kaldırın. Sonradan yüklenen uygulamalar da kilitli gelir.", 13f
+            countText = chip().apply {
+                setTextColor(Tones.PINK.accent)
+                background = round(Color.WHITE, 50)
+            }
+            addView(card("📱", "Uygulamalar", Tones.PINK,
+                text(
+                    "Tüm uygulamalar başta 🔒 kilitli gelir. Çocuğun PIN'siz açabilmesini istediklerinize " +
+                        "dokunup 🔓 serbest bırakın. Sonradan yüklenen uygulamalar da kilitli gelir.",
+                    13f, color = Palette.INK_SOFT
+                ),
+                countText,
+                LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    addView(button("🔒 Tümünü kilitle", Tones.PINK.accent) { setAll(locked = true) },
+                        LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(4) })
+                    addView(button("🔓 Tümü serbest", Color.WHITE, Tones.PINK.accent) { setAll(locked = false) },
+                        LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = dp(4) })
+                }
             ))
-            countText = text("", 13f, bold = true)
-            addView(countText)
-            addView(LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                val lp = { LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f) }
-                addView(button("Tümünü kilitle") { setAll(locked = true) }, lp())
-                addView(button("Tümünü serbest bırak") { setAll(locked = false) }, lp())
-            })
+            addView(View(this@MainActivity), LinearLayout.LayoutParams(1, dp(6)))
         }
     }
 
-    private fun card(vararg views: View): View = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setBackgroundColor(Color.parseColor("#F1F8E9"))
-        setPadding(dp(14), dp(10), dp(14), dp(10))
-        layoutParams = LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = dp(12) }
-        views.forEach { addView(it) }
-    }
-
     private fun refreshStatus() {
-        lockStatus.text = if (isAccessibilityOn()) "✅ Uygulama kilidi AÇIK"
-        else "⚠️ Uygulama kilidi KAPALI"
-
-        val p = Prefs.provider(this)
+        lockStatus.setChip(isAccessibilityOn(), "✅ Kilit AÇIK", "⚠️ Kilit KAPALI")
         val running = DnsVpnService.isRunning
-        dnsStatus.text = if (running) "✅ DNS koruması AÇIK" else "⚠️ DNS koruması KAPALI"
-        dnsToggle.text = if (running) "Korumayı kapat" else "Korumayı aç"
-        providerBtn.text = "Filtre: ${p.name} (değiştir)"
-
-        adminStatus.text = if (isAdminOn()) "✅ Silme koruması AÇIK" else "⚠️ Silme koruması KAPALI"
+        dnsStatus.setChip(running, "✅ Kalkan AÇIK", "⚠️ Kalkan KAPALI")
+        dnsToggle.text = if (running) "⏸️  Kalkanı kapat" else "▶️  Kalkanı aç"
+        providerBtn.text = "🎛️  Filtre: ${Prefs.provider(this).name}"
+        adminStatus.setChip(isAdminOn(), "✅ Koruma AÇIK", "⚠️ Koruma KAPALI")
     }
 
     private fun refreshSoon() {
@@ -393,10 +429,14 @@ class MainActivity : Activity() {
         shown.addAll(if (q.isEmpty()) apps else apps.filter {
             Apps.fold(it.label).contains(q) || it.pkg.contains(q)
         })
-        val lockedCount = apps.count { Prefs.isLocked(this, it.pkg) }
-        countText.text = "🔒 $lockedCount kilitli · 🔓 ${apps.size - lockedCount} serbest" +
-            if (q.isEmpty()) "" else "  ·  aramada ${shown.size} sonuç"
+        updateCount()
         adapter.notifyDataSetChanged()
+    }
+
+    private fun updateCount() {
+        val n = apps.count { Prefs.isLocked(this, it.pkg) }
+        countText.text = "🔒 $n kilitli   🔓 ${apps.size - n} serbest" +
+            if (query.isEmpty()) "" else "   🔍 ${shown.size} sonuç"
     }
 
     private fun loadApps() {
@@ -433,42 +473,54 @@ class MainActivity : Activity() {
         override fun getItemId(position: Int) = position.toLong()
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-            val row = (convertView as? LinearLayout) ?: LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(16), dp(8), dp(16), dp(8))
-                addView(ImageView(context), LinearLayout.LayoutParams(dp(40), dp(40)))
-                addView(TextView(context).apply {
-                    textSize = 16f
-                    setPadding(dp(12), 0, dp(8), 0)
-                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                addView(CheckBox(context))
+            val ctx = this@MainActivity
+            val outer = (convertView as? FrameLayout) ?: FrameLayout(ctx).apply {
+                setPadding(dp(14), dp(4), dp(14), dp(4))
+                addView(LinearLayout(ctx).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(12), dp(10), dp(12), dp(10))
+                    addView(ImageView(ctx), LinearLayout.LayoutParams(dp(44), dp(44)))
+                    addView(LinearLayout(ctx).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(dp(12), 0, dp(8), 0)
+                        addView(text("", 16f, bold = true))
+                        addView(text("", 12f, color = Palette.INK_SOFT).apply { setPadding(0, 0, 0, 0) })
+                    }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                    addView(chip().apply { (layoutParams as LinearLayout.LayoutParams).topMargin = 0 })
+                })
             }
-            val item = shown[position]
+            val row = outer.getChildAt(0) as LinearLayout
             val iv = row.getChildAt(0) as ImageView
-            val tv = row.getChildAt(1) as TextView
-            val cb = row.getChildAt(2) as CheckBox
+            val texts = row.getChildAt(1) as LinearLayout
+            val name = texts.getChildAt(0) as TextView
+            val note = texts.getChildAt(1) as TextView
+            val toggle = row.getChildAt(2) as TextView
 
+            val item = shown[position]
             iv.setImageDrawable(item.icon)
+            name.text = item.label
+
             fun paint(locked: Boolean) {
-                val state = if (locked) "🔒 Kilitli" else "🔓 Serbest"
-                val note = if (item.suggested && !locked) "  · kilitli kalması önerilir" else ""
-                tv.text = "${item.label}\n$state$note"
-                tv.setTextColor(if (locked) Color.parseColor("#212121") else Color.parseColor("#2E7D32"))
+                row.background = if (locked) round(Color.WHITE, 20, Color.parseColor("#FFD3E0"))
+                else round(Color.parseColor("#EFFFF2"), 20, Color.parseColor("#B8EBC4"))
+                toggle.setChip(!locked, "🔓 Serbest", "🔒 Kilitli")
+                note.text = when {
+                    item.suggested && !locked -> "⚠️ Kilitli kalması önerilir"
+                    item.suggested -> "⭐ Kilitli kalmalı"
+                    locked -> "Açmak için PIN gerekir"
+                    else -> "Çocuk serbestçe açabilir"
+                }
             }
-            cb.setOnCheckedChangeListener(null)
-            val locked = Prefs.isLocked(this@MainActivity, item.pkg)
-            cb.isChecked = locked
-            paint(locked)
-            cb.setOnCheckedChangeListener { _, checked ->
-                Prefs.setLocked(this@MainActivity, item.pkg, checked)
-                paint(checked)
-                val n = apps.count { Prefs.isLocked(this@MainActivity, it.pkg) }
-                countText.text = "🔒 $n kilitli · 🔓 ${apps.size - n} serbest" +
-                    if (query.isEmpty()) "" else "  ·  aramada ${shown.size} sonuç"
+            paint(Prefs.isLocked(ctx, item.pkg))
+
+            outer.setOnClickListener {
+                val nowLocked = !Prefs.isLocked(ctx, item.pkg)
+                Prefs.setLocked(ctx, item.pkg, nowLocked)
+                paint(nowLocked)
+                updateCount()
             }
-            row.setOnClickListener { cb.isChecked = !cb.isChecked }
-            return row
+            return outer
         }
     }
 
