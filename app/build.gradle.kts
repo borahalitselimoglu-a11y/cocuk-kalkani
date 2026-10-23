@@ -15,9 +15,24 @@ android {
         versionName = "1.0"
     }
 
+    // Sabit imza anahtarı: her derleme aynı imzayla çıkar, telefonda güncelleme
+    // eski sürümün üstüne kurulabilir (kaldırıp yeniden yüklemek gerekmez).
+    signingConfigs {
+        create("sabit") {
+            storeFile = file("cocuk-kalkani.keystore")
+            storePassword = "cocukkalkani"
+            keyAlias = "cocukkalkani"
+            keyPassword = "cocukkalkani"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("sabit")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("sabit")
         }
     }
 
