@@ -62,15 +62,22 @@ object Prefs {
         return Base64.encodeToString(out, Base64.NO_WRAP)
     }
 
-    // ---------- Kilitli uygulamalar ----------
-    fun blocked(c: Context): Set<String> =
-        sp(c).getStringSet("blocked", emptySet())?.toSet() ?: emptySet()
+    // ---------- Uygulama izinleri ----------
+    // Varsayılan: her uygulama KİLİTLİ. Yalnızca ebeveynin serbest bıraktıkları burada tutulur.
+    // Sonradan yüklenen yeni uygulamalar da otomatik kilitli gelir.
+    fun allowed(c: Context): Set<String> =
+        sp(c).getStringSet("allowed", emptySet())?.toSet() ?: emptySet()
 
-    fun setBlocked(c: Context, pkg: String, on: Boolean) {
-        val s = blocked(c).toMutableSet()
-        if (on) s.add(pkg) else s.remove(pkg)
-        sp(c).edit().putStringSet("blocked", s).apply()
+    fun isLocked(c: Context, pkg: String): Boolean = pkg !in allowed(c)
+
+    fun setLocked(c: Context, pkg: String, locked: Boolean) {
+        val s = allowed(c).toMutableSet()
+        if (locked) s.remove(pkg) else s.add(pkg)
+        sp(c).edit().putStringSet("allowed", s).apply()
     }
+
+    fun setAllowedAll(c: Context, pkgs: Set<String>) =
+        sp(c).edit().putStringSet("allowed", pkgs.toSet()).apply()
 
     // ---------- DNS ----------
     fun dnsEnabled(c: Context): Boolean = sp(c).getBoolean("dns_enabled", false)

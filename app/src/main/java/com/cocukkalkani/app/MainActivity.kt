@@ -19,7 +19,10 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.Button
+import android.text.Editable
+import android.text.TextWatcher
 import android.widget.CheckBox
+import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
@@ -44,7 +47,11 @@ class MainActivity : Activity() {
     private lateinit var providerBtn: Button
     private lateinit var adminStatus: TextView
     private val adapter = AppAdapter()
-    private val apps = mutableListOf<AppItem>()
+    private val apps = mutableListOf<AppItem>()      // tüm uygulamalar
+    private val shown = mutableListOf<AppItem>()     // aramaya göre görünenler
+    private var query = ""
+    private lateinit var list: ListView
+    private lateinit var countText: TextView
 
     private var authed = false
     private var stoppedAt = 0L
@@ -54,10 +61,35 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val list = ListView(this).apply { setPadding(0, 0, 0, dp(24)); clipToPadding = false }
+        list = ListView(this).apply { setPadding(0, 0, 0, dp(24)); clipToPadding = false }
         list.addHeaderView(buildHeader(), null, false)
         list.adapter = adapter
-        setContentView(list)
+
+        // Arama kutusu: ekranın üstünde sabit, yazınca liste uygulamalara kayar
+        val search = EditText(this).apply {
+            hint = "🔍  Uygulama ara (ör. youtube, oyun)"
+            isSingleLine = true
+            textSize = 16f
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(e: Editable?) {
+                    query = e?.toString().orEmpty().trim()
+                    applyFilter()
+                    if (query.isNotEmpty()) list.setSelection(list.headerViewsCount)
+                }
+            })
+            setOnFocusChangeListener { _, has -> if (has) list.setSelection(list.headerViewsCount) }
+        }
+
+        setContentView(LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(search, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(dp(12), dp(8), dp(12), 0) })
+            addView(list, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        })
         loadApps()
     }
 
@@ -131,8 +163,8 @@ class MainActivity : Activity() {
                 "1) Uygulama kilidini açın (Erişilebilirlik izni).\n" +
                     "2) Reklam/DNS korumasını açın.\n" +
                     "3) Silme korumasını etkinleştirin.\n" +
-                    "4) Aşağıdan çocuğun açmasını istemediğiniz uygulamaları işaretleyin. " +
-                    "Ayarlar ve Play Store'u kilitlemeniz, korumaların kapatılmasını önler."
+                    "4) Tüm uygulamalar başta KİLİTLİDİR. Listeden çocuğun serbestçe kullanabileceği " +
+                    "uygulamaların işaretini kaldırın. Ayarlar ve Play Store kilitli kalmalı."
             )
             .setPositiveButton("Anladım", null)
             .show()
@@ -184,10 +216,21 @@ class MainActivity : Activity() {
                 button("PIN değiştir") { setupPin(firstTime = false) }
             ))
 
-            addView(text("Kilitlenecek uygulamalar", 18f, bold = true).apply {
+            addView(text("Uygulamalar", 18f, bold = true).apply {
                 setPadding(0, dp(16), 0, 0)
             })
-            addView(text("İşaretlediğiniz uygulamalar açılınca PIN istenir.", 13f))
+            addView(text(
+                "Tüm uygulamalar varsayılan olarak KİLİTLİDİR (☑). Çocuğun PIN'siz açabilmesini " +
+                    "istediklerinizin işaretini kaldırın. Sonradan yüklenen uygulamalar da kilitli gelir.", 13f
+            ))
+            countText = text("", 13f, bold = true)
+            addView(countText)
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                val lp = { LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f) }
+                addView(button("Tümünü kilitle") { setAll(locked = true) }, lp())
+                addView(button("Tümünü serbest bırak") { setAll(locked = false) }, lp())
+            })
         }
     }
 
@@ -331,18 +374,39 @@ class MainActivity : Activity() {
 
     // ------------------------------------------------------------------ uygulama listesi
 
+    private fun setAll(locked: Boolean) {
+        val title = if (locked) "Tüm uygulamalar kilitlensin mi?" else "Tüm uygulamalar serbest bırakılsın mı?"
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setMessage(if (locked) null else "Ayarlar ve Play Store da serbest kalır; çocuk korumaları kapatabilir.")
+            .setPositiveButton("Evet") { _, _ ->
+                Prefs.setAllowedAll(this, if (locked) emptySet() else apps.map { it.pkg }.toSet())
+                applyFilter()
+            }
+            .setNegativeButton("İptal", null)
+            .show()
+    }
+
+    private fun applyFilter() {
+        val q = Apps.fold(query)
+        shown.clear()
+        shown.addAll(if (q.isEmpty()) apps else apps.filter {
+            Apps.fold(it.label).contains(q) || it.pkg.contains(q)
+        })
+        val lockedCount = apps.count { Prefs.isLocked(this, it.pkg) }
+        countText.text = "🔒 $lockedCount kilitli · 🔓 ${apps.size - lockedCount} serbest" +
+            if (q.isEmpty()) "" else "  ·  aramada ${shown.size} sonuç"
+        adapter.notifyDataSetChanged()
+    }
+
     private fun loadApps() {
         Thread {
             val pm = packageManager
-            val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
             val settingsPkg = Intent(Settings.ACTION_SETTINGS).resolveActivity(pm)?.packageName
             val suggested = setOfNotNull(settingsPkg, "com.android.vending")
             val collator = Collator.getInstance(Locale("tr", "TR"))
 
-            val items = pm.queryIntentActivities(launcher, 0)
-                .map { it.activityInfo.packageName }
-                .distinct()
-                .filter { it != packageName }
+            val items = Apps.lockablePackages(this)
                 .mapNotNull { pkg ->
                     try {
                         val ai = pm.getApplicationInfo(pkg, 0)
@@ -358,14 +422,14 @@ class MainActivity : Activity() {
             runOnUiThread {
                 apps.clear()
                 apps.addAll(items)
-                adapter.notifyDataSetChanged()
+                applyFilter()
             }
         }.start()
     }
 
     private inner class AppAdapter : BaseAdapter() {
-        override fun getCount() = apps.size
-        override fun getItem(position: Int): Any = apps[position]
+        override fun getCount() = shown.size
+        override fun getItem(position: Int): Any = shown[position]
         override fun getItemId(position: Int) = position.toLong()
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
@@ -380,17 +444,28 @@ class MainActivity : Activity() {
                 }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
                 addView(CheckBox(context))
             }
-            val item = apps[position]
+            val item = shown[position]
             val iv = row.getChildAt(0) as ImageView
             val tv = row.getChildAt(1) as TextView
             val cb = row.getChildAt(2) as CheckBox
 
             iv.setImageDrawable(item.icon)
-            tv.text = if (item.suggested) "${item.label}  (kilitlenmesi önerilir)" else item.label
+            fun paint(locked: Boolean) {
+                val state = if (locked) "🔒 Kilitli" else "🔓 Serbest"
+                val note = if (item.suggested && !locked) "  · kilitli kalması önerilir" else ""
+                tv.text = "${item.label}\n$state$note"
+                tv.setTextColor(if (locked) Color.parseColor("#212121") else Color.parseColor("#2E7D32"))
+            }
             cb.setOnCheckedChangeListener(null)
-            cb.isChecked = item.pkg in Prefs.blocked(this@MainActivity)
+            val locked = Prefs.isLocked(this@MainActivity, item.pkg)
+            cb.isChecked = locked
+            paint(locked)
             cb.setOnCheckedChangeListener { _, checked ->
-                Prefs.setBlocked(this@MainActivity, item.pkg, checked)
+                Prefs.setLocked(this@MainActivity, item.pkg, checked)
+                paint(checked)
+                val n = apps.count { Prefs.isLocked(this@MainActivity, it.pkg) }
+                countText.text = "🔒 $n kilitli · 🔓 ${apps.size - n} serbest" +
+                    if (query.isEmpty()) "" else "  ·  aramada ${shown.size} sonuç"
             }
             row.setOnClickListener { cb.isChecked = !cb.isChecked }
             return row

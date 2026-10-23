@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 
 /**
@@ -45,7 +46,9 @@ class AppLockService : AccessibilityService() {
         // Başka bir uygulamaya geçildiyse önceki geçici izin biter
         if (pkg != unlockedPackage) unlockedPackage = null
 
-        if (pkg in Prefs.blocked(this) && pkg != unlockedPackage) {
+        if (Apps.isExemptScreen(cls)) return          // gelen arama / alarm
+
+        if (pkg in lockable(pkg) && Prefs.isLocked(this, pkg) && pkg != unlockedPackage) {
             val i = Intent(this, LockActivity::class.java)
                 .putExtra(LockActivity.EXTRA_PKG, pkg)
                 .addFlags(
@@ -55,6 +58,21 @@ class AppLockService : AccessibilityService() {
                 )
             startActivity(i)
         }
+    }
+
+    // Kilitlenebilir paket listesi önbelleği (yeni yüklenen uygulama görülünce yenilenir)
+    private var lockableCache: Set<String> = emptySet()
+    private var lockableAt = 0L
+
+    private fun lockable(pkg: String): Set<String> {
+        val now = SystemClock.elapsedRealtime()
+        val stale = now - lockableAt > 60_000
+        val unknown = pkg !in lockableCache && now - lockableAt > 2_000
+        if (lockableAt == 0L || stale || unknown) {
+            lockableCache = Apps.lockablePackages(this)
+            lockableAt = now
+        }
+        return lockableCache
     }
 
     private fun isActivity(pkg: String, cls: String): Boolean = try {

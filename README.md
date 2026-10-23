@@ -2,7 +2,7 @@
 
 Harici kütüphane kullanmayan, tamamen cihaz üzerinde çalışan basit bir ebeveyn kontrol uygulaması.
 
-- **Uygulama kilidi:** Ebeveynin seçtiği uygulamalar açılınca PIN ekranı çıkar. PIN girilmeden uygulama kullanılamaz.
+- **Uygulama kilidi:** Tüm uygulamalar varsayılan olarak kilitlidir; ebeveyn yalnızca çocuğun serbestçe kullanabileceklerini açar. Sonradan yüklenen uygulamalar da kilitli gelir. Listede isimle arama yapılabilir. Gelen arama ve çalan alarm ekranları kilitlenmez.
 - **Reklam ve zararlı site engeli:** Telefonun DNS'i, cihaz içi yerel bir VPN ile **AdGuard Aile DNS**'e yönlendirilir (reklam, izleyici, yetişkin içerik, kötü amaçlı siteler engellenir; güvenli arama zorlanır). İstenirse AdGuard Standart veya Cloudflare Aile seçilebilir.
 - **Silme koruması:** Cihaz yöneticisi etkinleştirilince uygulama doğrudan silinemez.
 - **Koruma önlemleri:** Ebeveyn paneli PIN ister, 5 hatalı denemede 30 sn bekletir, ekran kapanınca açılan kilitler sıfırlanır, telefon yeniden başlayınca DNS koruması kendiliğinden açılır.
@@ -36,7 +36,7 @@ Klasörü **File › Open** ile açın, Gradle eşitlemesini bekleyin, **Build �
 6. **Kalıcı yapın:** "VPN ayarlarını aç" › Çocuk Kalkanı'nın yanındaki ⚙️ › **Her zaman açık VPN** → açık.
    ⚠️ **"VPN olmadan bağlantıları engelle"** seçeneğini açmayın (bu VPN yalnızca DNS taşıdığı için internet kesilebilir).
 7. **Silme koruması:** "Silme korumasını etkinleştir" › Etkinleştir.
-8. Listeden kilitlenecek uygulamaları işaretleyin. **Ayarlar** ve **Play Store**'u mutlaka kilitleyin; yoksa çocuk korumaları Ayarlar'dan kapatabilir. (Panelden açtığınız Ayarlar ekranları sizden tekrar PIN istemez.)
+8. Listede tüm uygulamalar kilitli gelir. Çocuğun PIN'siz kullanabileceği uygulamaların işaretini kaldırın (üstteki arama kutusuyla bulabilirsiniz). **Ayarlar** ve **Play Store** kilitli kalmalı; yoksa çocuk korumaları kapatabilir. (Panelden açtığınız Ayarlar ekranları sizden tekrar PIN istemez.)
 
 ### Test
 - Kilitli bir uygulamayı açın → PIN ekranı gelmeli.
@@ -61,8 +61,9 @@ app/src/main/java/com/cocukkalkani/app/
   LockActivity.kt    Kilitli uygulamanın üstüne çıkan PIN ekranı
   AppLockService.kt  Erişilebilirlik servisi: ön plandaki uygulamayı izler
   DnsVpnService.kt   Yerel DNS VPN'i: sorguları AdGuard'a iletir
-  Prefs.kt           PIN (tuzlanmış SHA-256), kilit listesi, DNS seçenekleri
+  Prefs.kt           PIN (tuzlanmış SHA-256), serbest uygulama listesi, DNS seçenekleri
   Receivers.kt       Açılışta başlatma + cihaz yöneticisi
+  Apps.kt            Kilitlenebilir uygulama listesi, arama yardımcısı
   Ui.kt              Küçük arayüz yardımcıları
 ```
 
