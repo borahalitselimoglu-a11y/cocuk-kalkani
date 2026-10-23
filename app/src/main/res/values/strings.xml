@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Çocuk Kalkanı</string>
+    <string name="accessibility_description">Çocuk Kalkanı, ebeveynin kilitlediği uygulamalar açıldığında PIN ekranı göstermek için hangi uygulamanın ön planda olduğunu izler. Ekran içeriği okunmaz, hiçbir veri cihaz dışına gönderilmez.</string>
+    <string name="admin_description">Çocuğun Çocuk Kalkanı uygulamasını silmesini engeller.</string>
+</resources>
