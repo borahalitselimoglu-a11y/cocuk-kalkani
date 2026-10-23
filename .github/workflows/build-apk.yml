@@ -17,13 +17,25 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.7"
+          gradle-version: "8.13"
 
-      - name: APK derle
-        run: gradle assembleDebug --no-daemon --stacktrace
+      - name: Derle (tam sürüm APK + Play sürümü AAB ve APK)
+        run: gradle assembleFullRelease bundlePlayRelease assemblePlayRelease --no-daemon --stacktrace
 
-      - name: APK'yı indirilebilir yap
+      - name: Tam sürüm APK (GitHub'dan dağıtım, reklam kalkanlı)
         uses: actions/upload-artifact@v4
         with:
-          name: CocukKalkani-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: CocukKalkani-tam-apk
+          path: app/build/outputs/apk/full/release/*.apk
+
+      - name: Play sürümü AAB (Play Console'a yüklenecek dosya)
+        uses: actions/upload-artifact@v4
+        with:
+          name: CocukKalkani-play-aab
+          path: app/build/outputs/bundle/playRelease/*.aab
+
+      - name: Play sürümü APK (telefonda denemek için)
+        uses: actions/upload-artifact@v4
+        with:
+          name: CocukKalkani-play-apk
+          path: app/build/outputs/apk/play/release/*.apk

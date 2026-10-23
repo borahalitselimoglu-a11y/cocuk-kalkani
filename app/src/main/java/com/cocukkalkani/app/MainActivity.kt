@@ -9,10 +9,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.LayerDrawable
-import android.net.VpnService
 import android.os.Bundle
 import android.os.SystemClock
 import android.provider.Settings
@@ -63,8 +63,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = Palette.PAGE
-        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
+        setBarIcons(darkIcons = true)
 
         list = ListView(this).apply {
             setPadding(0, 0, 0, dp(32))
@@ -88,6 +87,7 @@ class MainActivity : Activity() {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
             ).apply { setMargins(dp(12), dp(10), dp(12), dp(4)) })
             addView(list, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+            fitSystemBars()
         })
         loadApps()
     }
@@ -235,22 +235,10 @@ class MainActivity : Activity() {
             addView(card("🔒", "Uygulama kilidi", Tones.BLUE,
                 lockStatus,
                 text("Ayarlar › Erişilebilirlik › İndirilen uygulamalar › Çocuk Kalkanı → Aç", 13f, color = Palette.INK_SOFT),
-                button("⚙️  Erişilebilirlik ayarlarını aç", Tones.BLUE.accent) {
-                    openTrusted(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                }
+                button("⚙️  Erişilebilirlik ayarlarını aç", Tones.BLUE.accent) { askAccessibilityConsent() }
             ))
 
-            addView(card("🧹", "Reklam ve zararlı site kalkanı", Tones.GREEN,
-                dnsStatus,
-                providerBtn,
-                dnsToggle,
-                text("💡 Kalıcı olsun: Ayarlar › VPN › Çocuk Kalkanı › \"Her zaman açık VPN\" açın. " +
-                    "\"VPN olmadan bağlantıları engelle\" seçeneğini AÇMAYIN.", 13f, color = Palette.INK_SOFT),
-                button("🌐  VPN ayarlarını aç", Color.WHITE, Tones.GREEN.accent) {
-                    openTrusted(Intent(Settings.ACTION_VPN_SETTINGS))
-                },
-                button("🔁  Alternatif: Özel DNS (VPN'siz)", Color.WHITE, Tones.GREEN.accent) { showPrivateDnsHelp() }
-            ))
+            addView(if (DnsControl.SUPPORTED) dnsShieldCard() else dnsGuideCard())
 
             addView(card("🧷", "Silme koruması", Tones.ORANGE,
                 adminStatus,
@@ -284,9 +272,56 @@ class MainActivity : Activity() {
         }
     }
 
+    /** Tam sürüm: uygulama içinden açılıp kapatılan DNS kalkanı (yerel VPN). */
+    private fun dnsShieldCard(): View = card("🧹", "Reklam ve zararlı site kalkanı", Tones.GREEN,
+        dnsStatus,
+        providerBtn,
+        dnsToggle,
+        text("💡 Kalıcı olsun: Ayarlar › VPN › Çocuk Kalkanı › \"Her zaman açık VPN\" açın. " +
+            "\"VPN olmadan bağlantıları engelle\" seçeneğini AÇMAYIN.", 13f, color = Palette.INK_SOFT),
+        button("🌐  VPN ayarlarını aç", Color.WHITE, Tones.GREEN.accent) {
+            openTrusted(Intent(Settings.ACTION_VPN_SETTINGS))
+        },
+        button("🔁  Alternatif: Özel DNS (VPN'siz)", Color.WHITE, Tones.GREEN.accent) { showPrivateDnsHelp() }
+    )
+
+    /** Play sürümü: uygulama DNS'e dokunmaz; ebeveyn telefonun kendi ayarını değiştirir. */
+    private fun dnsGuideCard(): View {
+        val host = DNS_PROVIDERS[0].privateHost
+        val step = { n: String, t: String ->
+            text("$n  $t", 14f).apply { setPadding(0, dp(3), 0, dp(3)) }
+        }
+        return card("🌐", "Güvenli internet (DNS) ayarı", Tones.GREEN,
+            text("Telefonun kendi \"Özel DNS\" ayarını aile filtreli bir DNS ile değiştirerek " +
+                "yetişkin içerikli ve zararlı sitelere erişimi engelleyebilirsiniz. " +
+                "Bu ayarı Çocuk Kalkanı değil, telefonun kendisi uygular.", 13f, color = Palette.INK_SOFT),
+            step("1️⃣", "Ayarlar'ı açın."),
+            step("2️⃣", "Samsung: Bağlantılar › Diğer bağlantı ayarları › Özel DNS\n" +
+                "      Diğer telefonlar: Ağ ve internet › Özel DNS"),
+            step("3️⃣", "\"Özel DNS sağlayıcı ana makine adı\" seçeneğini seçin."),
+            step("4️⃣", "Kutucuğa aşağıdaki adresi yazıp Kaydet'e dokunun:"),
+            TextView(this).apply {
+                text = host
+                textSize = 17f
+                setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+                setTextColor(Tones.GREEN.accent)
+                gravity = Gravity.CENTER
+                setTextIsSelectable(true)
+                background = round(Color.WHITE, 14, Color.parseColor("#B8EBC4"))
+                setPadding(dp(12), dp(12), dp(12), dp(12))
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dp(6); bottomMargin = dp(6) }
+            },
+            text("💡 Adrese uzun basıp kopyalayabilirsiniz. Ayarlar uygulaması kilitli kalırsa " +
+                "çocuk bu ayarı değiştiremez. Menü adları telefon markasına göre biraz farklı olabilir.",
+                13f, color = Palette.INK_SOFT)
+        )
+    }
+
     private fun refreshStatus() {
         lockStatus.setChip(isAccessibilityOn(), "✅ Kilit AÇIK", "⚠️ Kilit KAPALI")
-        val running = DnsVpnService.isRunning
+        val running = DnsControl.isRunning()
         dnsStatus.setChip(running, "✅ Kalkan AÇIK", "⚠️ Kalkan KAPALI")
         dnsToggle.text = if (running) "⏸️  Kalkanı kapat" else "▶️  Kalkanı aç"
         providerBtn.text = "🎛️  Filtre: ${Prefs.provider(this).name}"
@@ -321,23 +356,19 @@ class MainActivity : Activity() {
     // ------------------------------------------------------------------ DNS
 
     private fun toggleDns() {
-        if (DnsVpnService.isRunning) {
-            Prefs.setDnsEnabled(this, false)
-            startService(Intent(this, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_STOP))
+        if (DnsControl.isRunning()) {
+            DnsControl.stop(this)
             refreshSoon()
             return
         }
-        val consent = VpnService.prepare(this)
-        if (consent != null) {
-            startActivityForResult(consent, REQ_VPN)
-        } else {
-            startDns()
+        askVpnConsent {
+            val consent = DnsControl.consentIntent(this)
+            if (consent != null) startActivityForResult(consent, REQ_VPN) else startDns()
         }
     }
 
     private fun startDns() {
-        Prefs.setDnsEnabled(this, true)
-        startService(Intent(this, DnsVpnService::class.java).setAction(DnsVpnService.ACTION_START))
+        DnsControl.start(this)
         refreshSoon()
     }
 
@@ -349,6 +380,52 @@ class MainActivity : Activity() {
         }
     }
 
+    // ------------------------------------------------------------------ açıklama + onay ekranları
+
+    /** Erişilebilirlik izni istenmeden önce ne için kullanıldığını açıklar ve açık onay alır. */
+    private fun askAccessibilityConsent() {
+        if (isAccessibilityOn()) {
+            openTrusted(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("🔒 Erişilebilirlik izni neden gerekli?")
+            .setMessage(
+                "Çocuk Kalkanı, kilitlediğiniz uygulamalar açıldığında PIN ekranını gösterebilmek için " +
+                    "Android'in Erişilebilirlik hizmetini (AccessibilityService API) kullanır.\n\n" +
+                    "• Erişilen bilgi: Yalnızca o an ekranda hangi uygulamanın açık olduğu (uygulamanın paket adı).\n" +
+                    "• Kullanım: Bu bilgi yalnızca telefonda, açılan uygulamanın kilitli olup olmadığını " +
+                    "kontrol etmek için anlık olarak kullanılır.\n" +
+                    "• Ekrandaki yazılar, mesajlar, şifreler veya başka içerik OKUNMAZ.\n" +
+                    "• Hiçbir bilgi kaydedilmez, telefondan dışarı gönderilmez ve kimseyle paylaşılmaz.\n\n" +
+                    "Onay verirseniz Erişilebilirlik ayarları açılacak; orada Çocuk Kalkanı'nı açmanız gerekir. " +
+                    "Onay vermezseniz uygulama kilidi çalışmaz, diğer özellikler çalışmaya devam eder."
+            )
+            .setPositiveButton("Kabul ediyorum") { _, _ ->
+                openTrusted(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            }
+            .setNegativeButton("Kabul etmiyorum") { _, _ ->
+                toast("İzin verilmedi. Uygulama kilidi kapalı kalacak; istediğiniz zaman tekrar açabilirsiniz.")
+            }
+            .show()
+    }
+
+    /** Tam sürüm: VPN izni istenmeden önce açıklama + onay. */
+    private fun askVpnConsent(onAccept: () -> Unit) {
+        AlertDialog.Builder(this)
+            .setTitle("🌐 DNS kalkanı nasıl çalışır?")
+            .setMessage(
+                "DNS kalkanı, telefonda yerel bir VPN bağlantısı kurar. Bu bağlantıdan yalnızca DNS sorguları " +
+                    "(açılmak istenen sitelerin adları) geçer ve seçtiğiniz filtreli DNS sağlayıcısına iletilir.\n\n" +
+                    "• Diğer internet trafiğinize dokunulmaz.\n" +
+                    "• Hiçbir bilgi Çocuk Kalkanı geliştiricisine gönderilmez veya kaydedilmez.\n\n" +
+                    "Devam ederseniz Android sizden VPN izni isteyecek."
+            )
+            .setPositiveButton("Kabul ediyorum") { _, _ -> onAccept() }
+            .setNegativeButton("Vazgeç", null)
+            .show()
+    }
+
     private fun chooseProvider() {
         val names = DNS_PROVIDERS.map { "${it.name}\n${it.desc}" }.toTypedArray()
         AlertDialog.Builder(this)
@@ -356,7 +433,7 @@ class MainActivity : Activity() {
             .setSingleChoiceItems(names, Prefs.providerIndex(this)) { d, which ->
                 Prefs.setProviderIndex(this, which)
                 d.dismiss()
-                if (DnsVpnService.isRunning) startDns() // yeni sağlayıcıyla yeniden başlat
+                if (DnsControl.isRunning()) startDns() // yeni sağlayıcıyla yeniden başlat
                 refreshSoon()
             }
             .setNegativeButton("Kapat", null)

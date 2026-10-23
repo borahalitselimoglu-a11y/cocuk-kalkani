@@ -6,7 +6,9 @@ import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.widget.FrameLayout
+import android.os.Build
 import android.os.Bundle
+import android.window.OnBackInvokedDispatcher
 import android.os.SystemClock
 import android.view.Gravity
 import android.view.WindowManager
@@ -37,7 +39,15 @@ class LockActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
 
-        window.statusBarColor = Palette.HERO[0]
+        setBarIcons(darkIcons = false)
+
+        // Android 13+: geri hareketi/tuşu kilit ekranını kapatıp kilitli uygulamayı açığa çıkarmasın.
+        // (API 36 hedefleyen uygulamalarda onBackPressed artık çağrılmıyor.)
+        if (Build.VERSION.SDK_INT >= 33) {
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(
+                OnBackInvokedDispatcher.PRIORITY_OVERLAY
+            ) { goHome() }
+        }
 
         icon = ImageView(this)
         title = text("", 22f, bold = true).apply { gravity = Gravity.CENTER }
@@ -94,6 +104,7 @@ class LockActivity : Activity() {
             addView(cardView, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(12) })
+            fitSystemBars()
         }
         setContentView(root)
         handle(intent)

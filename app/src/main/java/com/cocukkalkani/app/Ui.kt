@@ -13,7 +13,10 @@ import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
+import android.os.Build
 import android.text.InputType
+import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -191,6 +194,39 @@ fun Context.pinField(hint: String = "PIN"): EditText =
         background = round(Color.parseColor("#F3EEFF"), 18, Color.parseColor("#D7C6FF"))
         setPadding(dp(16), dp(12), dp(16), dp(12))
     }
+
+/**
+ * Android 15+ (API 35/36) uygulamaları ekranın kenarına kadar çizer.
+ * İçeriğin durum çubuğu, gezinme çubuğu ve klavye altında kalmaması için iç boşluk ekler.
+ */
+fun View.fitSystemBars() {
+    if (Build.VERSION.SDK_INT < 35) return
+    val l = paddingLeft
+    val t = paddingTop
+    val r = paddingRight
+    val b = paddingBottom
+    setOnApplyWindowInsetsListener { v, insets ->
+        val i = insets.getInsets(
+            WindowInsets.Type.systemBars() or WindowInsets.Type.ime() or WindowInsets.Type.displayCutout()
+        )
+        v.setPadding(l + i.left, t + i.top, r + i.right, b + i.bottom)
+        insets
+    }
+    requestApplyInsets()
+}
+
+/** Durum/gezinme çubuğu simgeleri: açık zeminde koyu (dark=true), koyu zeminde beyaz. */
+@Suppress("DEPRECATION")
+fun Activity.setBarIcons(darkIcons: Boolean) {
+    if (Build.VERSION.SDK_INT >= 30) {
+        val mask = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+            WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+        window.insetsController?.setSystemBarsAppearance(if (darkIcons) mask else 0, mask)
+    } else {
+        window.decorView.systemUiVisibility =
+            if (darkIcons) View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR else 0
+    }
+}
 
 /** PIN soran diyalog. */
 fun Activity.pinDialog(
