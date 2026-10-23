@@ -9,6 +9,19 @@ Harici kütüphane kullanmayan, tamamen cihaz üzerinde çalışan basit bir ebe
 
 Gizlilik: Ekran içeriği okunmaz. VPN yalnızca DNS sorgularını filtreli sunucuya iletir; diğer internet trafiğine dokunmaz ve hiçbir veri geliştiriciye gönderilmez.
 
+
+## İki sürüm
+
+| | **Tam sürüm** (GitHub APK) | **Play sürümü** (Google Play) |
+|---|---|---|
+| Paket adı | `com.cocukkalkani.app` | `com.cocukkalkani.aile` |
+| Uygulama kilidi | ✅ | ✅ |
+| Silme koruması | ✅ | ✅ |
+| DNS | Uygulama içinden açılan reklam/zararlı site kalkanı (yerel VPN) | Telefonun Özel DNS ayarı için yazılı rehber (VPN ve internet izni yok) |
+| Derleme çıktısı | `CocukKalkani-tam-apk` | `CocukKalkani-play-aab` (+ deneme için `CocukKalkani-play-apk`) |
+
+Play'de yayın adımları: [`docs/PLAY-STORE.md`](docs/PLAY-STORE.md) · Gizlilik politikası: [`docs/gizlilik.html`](docs/gizlilik.html)
+
 ---
 
 ## APK nasıl elde edilir
@@ -67,4 +80,4 @@ app/src/main/java/com/cocukkalkani/app/
   Ui.kt              Küçük arayüz yardımcıları
 ```
 
-minSdk 26 (Android 8.0) · targetSdk 34 · Kotlin · harici bağımlılık yok.
+minSdk 26 (Android 8.0) · targetSdk 36 · Kotlin · harici bağımlılık yok.
